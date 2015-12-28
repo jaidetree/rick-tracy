@@ -14,8 +14,6 @@ export default function trace (opts) {
   }, opts);
 
   return new Promise((resolve, reject) => {
-    let caseFile = {};
-
     /**
      * Returns a stream wrapped with an error handler
      * @param {stream} stream - Transform or duplex stream to wrap
@@ -42,13 +40,8 @@ export default function trace (opts) {
        * Record evidence in our case file. Involves photos and red string.
        * Uses a writable stream
        */
-      .pipe(then(record((evidence) => {
-        Object.assign(caseFile, evidence);
-      })))
-
-      /**
-       * Finally publish our caseFile
-       */
-      .on('finish', () => resolve(caseFile));
+      .pipe(then(record((caseFile) => {
+        console.log(caseFile);
+      })));
   });
 }
