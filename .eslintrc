@@ -1,6 +1,5 @@
 {
    "parser": "babel-eslint",
-   "plugins": ["react"],
    "env": {
     "browser": true,
     "es6": true,
@@ -8,14 +7,8 @@
    },
    "globals": {
     "require": true,
-    "DataBootstrap": true,
-    "CKEDITOR": true,
-    "Backbone": true,
-    "React": true,
-    "Braintree": true,
-    "google": true,
-    "Raven": true,
-    "mixpanel": true
+    "describe": true,
+    "it": true
    },
    "ecmaFeatures": {
     "arrowFunctions": true,
@@ -239,7 +232,7 @@
       "require": {
         "FunctionDeclaration": true,
         "MethodDefinition": true,
-        "ClassDeclaration": false,
+        "ClassDeclaration": false
       }
     }],
     "semi": 1, // ....................................... Enforce spacing before and after semicolons
