@@ -1,0 +1,51 @@
+{
+  "name": "rick-tracy",
+  "version": "0.0.1",
+  "description": "A pluggable dependency graph array generator. Detective Rick Tracy always catches mad modules!",
+  "main": "index.js",
+  "scripts": {
+    "test": "gulp test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jayzawrotny/rick-tracy.git"
+  },
+  "keywords": [
+    "dependency",
+    "graph",
+    "dependency-graph",
+    "detective"
+  ],
+  "author": "Jay Zawrotny",
+  "license": "BSD-3-Clause",
+  "bugs": {
+    "url": "https://github.com/jayzawrotny/rick-tracy/issues"
+  },
+  "homepage": "https://github.com/jayzawrotny/rick-tracy",
+  "dependencies": {
+    "babel-core": ">= 6.2.1 < 7",
+    "babel-plugin-transform-es2015-modules-commonjs": ">= 6.3.16 < 7",
+    "detective-cjs": "^1.0.5",
+    "vinyl-file": "^1.3.0",
+    "vinyl-fs": "^2.2.1"
+  },
+  "devDependencies": {
+    "babel-eslint": ">= 4.1.6",
+    "babel-preset-es2015": ">= 6.1.18 < 7",
+    "babel-preset-stage-0": ">= 6.1.18 < 7",
+    "eslint-plugin-react": ">= 3.10.0",
+    "expect": "^1.13.4",
+    "gulp": ">= 3.9.0 < 4",
+    "gulp-babel": ">= 6.1.0 < 7",
+    "gulp-eslint": ">= 1.0.0 < 7",
+    "gulp-mocha": ">= 2.2.0",
+    "gulp-plumber": ">= 1.0.1",
+    "gulp-uglify": "^1.5.1",
+    "gulp-util": ">= 3.0.7",
+    "gulp-watch": ">= 4.3.5",
+    "liquidlog": ">= 0.0.5",
+    "minimist": "^1.2.0",
+    "strip-json-comments": ">= 1.0.4",
+    "through2": ">= 2.0.0"
+  }
+}
