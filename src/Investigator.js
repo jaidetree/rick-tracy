@@ -4,20 +4,49 @@ import question from 'detective-cjs';
 import resolve from 'resolve';
 import vinylFile from 'vinyl-file';
 
-import Deferred from './deferred';
+import Deferred from './Deferred';
 
 import { Duplex } from 'stream';
+
+/**
+ * ---------------------------------------------------------------------------
+ * Description:
+ * ---------------------------------------------------------------------------
+ * This stream is responsible for taking input files like your top level
+ * app entry points and gathering all their dependencies and subdependencies.
+ *
+ * It then emits the below output that the EvidenceLocker stream can use to
+ * assemble into a tree. This is designed so that you could replace the
+ * EvidenceLocker stream with any other kind of stream to assemble the deps
+ * however you would like.
+ * –––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+ *
+ * ---------------------------------------------------------------------------
+ * Input: Vinyl Files
+ * ---------------------------------------------------------------------------
+ * Output: 
+ * ---------------------------------------------------------------------------
+ * {
+ *   suspect: '/path/to/src/Investigator.js,
+ *   leads: [
+ *     '/path/to/src/deferred.js'
+ *   ],
+ *   source: null || '/path/to/parent/file'
+ * }
+ * –––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+ */
 
 /**
  * Investigator questions, interrogates, and gathers evidence from all
  * the suspects.
  */
-export class Investigator extends Duplex {
+export default class Investigator extends Duplex {
   /**
    * Initializes the investigator
    *
    * @constructor
    * @param {object} opts - Initialization opts sent to the stream interface
+   * @param {boolean} opts.ignorePackages - Ignore node packages
    */
   constructor (opts={}) {
     super({ objectMode: true });
@@ -195,14 +224,4 @@ export class Investigator extends Duplex {
     this.interrogate(suspect)
       .then(() => done());
   }
-}
-
-/**
- * Starts our initial investigation
- *
- * @param {...*} args - Args to pass to the Lead Investigator constructor
- * @returns {stream} Duplex stream instance
- */
-export default function investigate (...args) {
-  return new Investigator(...args);
 }
