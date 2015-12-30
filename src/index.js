@@ -1,55 +1,170 @@
 import CaseReporter from './CaseReporter';
 import Investigator from './Investigator';
+import EventEmitter from 'events';
 import EvidenceLocker from './EvidenceLocker';
+import splicer from 'labeled-stream-splicer';
 import vfs from 'vinyl-fs';
 
 /**
- * Traces a glob of files into a giant tree.
- * @param {object} opts - Options to configure the tracer
- * @param {string} opts.lineup - Entry point glob to track down.
- * @returns {Promise} A new promise that is resolved when tracing is complete
- * @todo Use that labeled stream splicer to make a more customizable workflow
+ * @example
+ * import fs from 'fs';
+ * import JSONStream from 'JSONStream';
+ * import RickTracy from 'rick-tracy';
+ *
+ * let rickTracy = new RickTracy({
+ *   // the usual suspects ;)
+ *   lineup: 'path/to/entry/points/**\/*.js'
+ * });
+ *
+ * // Writes the depdendency tree to a text file as part of the pipeline
+ * let output = new fs.createWriteStream('tree.txt');
+ * investigation.pipeline.get('report').push(JSONSTream.stringify());
+ * investigation.pipline.get('report').push(output);
+ *
+ * // Build the dependency graph
+ * rickTracy.investigate()
+ *   .pipe(JSONStream.stringify())
+ *   .pipe(new fs.createWriteStream())
+ *
+ *   // Or get the tree from the complete handler
+ *   .on('complete', (caseFile) => {
+ *     console.log(caseFile);
+ *   });
  */
-export default function trace (opts) {
-  let options = Object.assign({
-    glob: '**/*.js',
-  }, opts);
 
-  return new Promise((resolve, reject) => {
-    /**
-     * Returns a stream wrapped with an error handler
-     * @param {stream} stream - Transform or duplex stream to wrap
-     * @returns {stream} Wrapped stream
-     */
-    function to (stream) {
-      return stream
-        .on('error', (err) => reject(err));
-    }
+/**
+ * Exposed module api
+ * @extends {EventEmitter}
+ * @property {object} caseFile - Finished dependency graph
+ * @property {boolean} isComplete - If the tracing is complete yet
+ * @property {array} process - The list of methods in the order they are
+ *                             added to the stream splicer pipeline.
+ */
+export default class RickTracy extends EventEmitter {
+  caseFile = {};
 
-    /**
-     * Find our suspects.
-     * Uses vinyl-fs to gather our main entry point files.
-     */
-    vfs.src(options.lineup)
+  isComplete = false;
 
-      /**
-       * Investigate each suspect.
-       * Uses our home-grown tracer stream to trace our dependencies
-       */
-      .pipe(to(new Investigator()))
+  process = [
+    'trace',
+    'store',
+    'report',
+  ];
 
-      /**
-       * Record evidence in our case file. Involves photos and red string.
-       */
-      .pipe(to(new EvidenceLocker()))
+  /**
+   * @constructor
+   * @param {object} opts - Initial investigation options
+   * @param {string} opts.lineup - Glob string of files to search for
+   * @param {object} opts.trace - Tracing options
+   * @param {function} opts.trace.filter - Filter function to determine which
+   *                                       ids to skip resolving.
+   * @param {function} opts.trace.packageFilter - Transform method on packages
+   * @param {function} opts.trace.postFilter - Filter function to determine if
+   *                                           a resolved id should be parsed.
+   */
+  constructor (opts={}) {
+    super();
 
-      /**
-       * Review the casefile in a writable stream to emit the finish & end
-       * events.
-       */
-      .pipe(to(new CaseReporter((caseFile) => {
-        console.log(caseFile);
-        resolve(caseFile);
-      })));
-  });
+    this.options = {
+      lineup: '**/*.js',
+      trace: {
+        ignorePackages: true, // Don't trace node_modules
+        compileES6Modules: true, // Use babel to compile imports into require.
+      },
+      evidence: {},
+      report: this.onComplete,
+    };
+
+    // Extend the default options by each subkey
+    Object.keys(opts).forEach((key) => {
+      Object.assign(this.options[key], opts[key]);
+    });
+
+    this.pipeline = this.createPipeline();
+  }
+
+  /**
+   * Creates our labeled stream splicer instance. This allows users to
+   * customize the flow of data between phases. For instance if users wanted
+   * to assemble the data into a different kind of data structure or graphing
+   * UI they could replace out the store step.
+   *
+   * @returns {stream} Labeled stream splicer instance
+   */
+  createPipeline () {
+    let pipeline = [];
+
+    // Build our stream splicer array which is ['label', stream()]
+    this.process.forEach((label) => {
+      pipeline.push(label);
+      pipeline.push(this.passTo(`_${label}`));
+    });
+
+    // Return our splicer instance
+    return splicer.obj(pipeline);
+  }
+
+  /**
+   * Begins tracing the dependenceis and piping the vinyl files into our
+   * pipeline.
+   *
+   * @returns {stream} Resulting stream from the pipeline.
+   */
+  investigate () {
+    return vfs.src(this.options.lineup)
+      .pipe(this.pipeline);
+  }
+
+  /**
+   * Event handler when the caseFile (dependency graph) has been assembled
+   *
+   * @param {object} caseFile - Finalized dependency tree
+   */
+  onComplete (caseFile) {
+    this.isComplete = true;
+    this.caseFile = caseFile;
+    this.emit('complete', caseFile);
+  }
+
+  /**
+   * Basic method to wrap the stream with an error handler
+   * @param {string} methodName - Stream returning method to add to pipeline
+   * @returns {stream} A stream wrapped with an error handler
+   */
+  passTo (methodName) {
+    return this[methodName](this.options)
+      .on('error', this.emit.bind(this, 'error'));
+  }
+
+  /**
+   * Traces our dependencies. Takes an input of vinyl files and produces an
+   * object detailing each dependency and its parent and children.
+   *
+   * @param {object} options - Our initial options passed to class constructor
+   * @returns {stream} A stream to be used in the main pipeline
+   */
+  _trace (options) {
+    return new Investigator(options.investigate);
+  }
+
+  /**
+   * Stores our dependencies and outputs a tree
+   *
+   * @param {object} options - Our initial options passed to class constructor
+   * @returns {stream} A stream to be used in the main pipeline
+   */
+  _store (options) {
+    return new EvidenceLocker(options.evidence);
+  }
+
+  /**
+   * A writable stream to consume the dependency tree and fire our callback
+   * to emit a complete event with the final tree.
+   *
+   * @param {object} options - Our initial options passed to class constructor
+   * @returns {stream} A stream to be used in the main pipeline
+   */
+  _report (options) {
+    return new CaseReporter(options.report);
+  }
 }

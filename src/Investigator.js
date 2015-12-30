@@ -1,7 +1,11 @@
 import babel from 'babel-core';
+import combine from 'stream-combiner2';
+import concat from 'stream-concat';
+import duplexer from 'duplexer2';
+import nodeResolve from 'resolve';
 import path from 'path';
 import question from 'detective-cjs';
-import resolve from 'resolve';
+import through from 'through2';
 import vinylFile from 'vinyl-file';
 
 import Deferred from './Deferred';
@@ -24,7 +28,7 @@ import { Duplex } from 'stream';
  * ---------------------------------------------------------------------------
  * Input: Vinyl Files
  * ---------------------------------------------------------------------------
- * Output: 
+ * Output:
  * ---------------------------------------------------------------------------
  * {
  *   suspect: '/path/to/src/Investigator.js,
@@ -66,6 +70,43 @@ export default class Investigator extends Duplex {
   }
 
   /**
+   * Combines transforms into a single stream then creates a duplex stream
+   * outputting the result of all the combined transforms.
+   *
+   * @param {arary} transformStreams - Array of transforms and\or module names
+   * @returns {stream} A duplex stream that will emit the result of all the
+   *                   transform streams.
+   */
+  createTransformer (transformStreams=[]) {
+    let input = through(),
+        output = through(),
+        stream = duplexer(input, output),
+        pipeline;
+
+    transformStreams = transformStreams.map((transform) => {
+      // If transform is a string try to import it
+      if (typeof transform !== 'function') {
+        transform = require(nodeResolve.sync(transform));
+      }
+
+      // Decorate the stream with an error handler
+      return transform
+        .on('error', stream.emit.bind(stream, 'error'));
+    });
+
+    // Combine all transforms into a single stream
+    pipeline = combine(...transformStreams);
+
+    /**
+     * Tell our parent duplex stream to pipe to our pipeline. Then tell our
+     * pipeline to pipe to the output stream of our parent duplex..
+     */
+    input.pipe(pipeline).pipe(output);
+
+    return stream;
+  }
+
+  /**
    * Roughs up the suspect then questions it for leads
    *
    * @param {vinyl} suspect - A vinyl file to compile
@@ -75,7 +116,8 @@ export default class Investigator extends Duplex {
   interrogate (suspect, source=null) {
     let leads = [],
         investigations = [],
-        isNoted = this.isNoted(suspect);
+        isNoted = this.isNoted(suspect),
+        deferred = new Deferred();
 
     if (isNoted) {
       leads = this.readNotesOn(suspect);
@@ -86,18 +128,24 @@ export default class Investigator extends Duplex {
      *  its statements. Then track down those statements to find new suspects.
      */
     else {
-      suspect.contents = this.roughUp(suspect);
-      leads = this.verify(suspect, question(suspect.contents));
+      // Transform the source to make the suspect spill it’s guts
+      this.roughUp(suspect)
+        .then((guts) => {
+          leads = this.verify(suspect, question(guts));
+          // Remember this suspect for later.
+          this.note(suspect, leads);
 
-      // Remember this suspect for later.
-      this.note(suspect, leads);
+          // For each lead found start a new investigation
+          leads.forEach((lead) => {
+            investigations.push(this.trackDown(lead).then((newSuspect) => {
+              return this.interrogate(newSuspect, suspect.path);
+            }));
+          });
 
-      // For each lead found start a new investigation
-      leads.forEach((lead) => {
-        investigations.push(this.trackDown(lead).then((newSuspect) => {
-          return this.interrogate(newSuspect, suspect.path);
-        }));
-      });
+          // Resolve the deferred result with a promise that is resolved when
+          // all investigations are complete. (tracing of submodules)
+          deferred.resolve(Promise.all(investigations));
+        });
     }
 
     this.push({
@@ -106,7 +154,7 @@ export default class Investigator extends Duplex {
       source,
     });
 
-    return Promise.all(investigations);
+    return deferred;
   }
 
   /**
@@ -146,13 +194,40 @@ export default class Investigator extends Duplex {
    * @returns {buffer} New buffer with compiled contents
    */
   roughUp (suspect) {
-    let result = babel.transform(suspect.contents.toString('utf8'), {
-      babelrc: false,
-      plugins: ['transform-es2015-modules-commonjs'],
-      sourceMap: false,
-    });
+    let code = suspect.contents.toString('utf8'),
+        transforms = this.options.transforms;
 
-    return new Buffer(result.code);
+    // If the user has specified not to compile ES6 modules then uh don’t.
+    if (this.options.compileES6Modules) {
+      let result = babel.transform(suspect.contents.toString('utf8'), {
+        babelrc: false,
+        plugins: ['transform-es2015-modules-commonjs'],
+        sourceMap: false,
+      });
+
+      code = new Buffer(result.code);
+    }
+
+    return new Promise((resolve, reject) => {
+      let transformerStream;
+
+      // If no transform options are given just return the resulting code
+      if (!Array.isArray(transforms) || !transforms.length) {
+        resolve(code);
+        return;
+      }
+
+      // Create transform stream
+      transformerStream = this.createTransformer(transforms)
+        .on('error', reject);
+
+      /**
+       * Since transforms could push data in any amount of smaller chunks
+       * lets buffer them into a single chunk of text with the fully
+       * transformed.
+       */
+      transformerStream.pipe(concat(resolve));
+    });
   }
 
   /**
@@ -181,29 +256,37 @@ export default class Investigator extends Duplex {
    */
   verify (suspect, leads) {
     let basedir = path.dirname(suspect.path),
+        options = this.options,
         verifiedLeads = [];
 
+    // Filter leads
+    if (options.filter) verifiedLeads = leads.filter(options.filter);
+
     // Resolve the packages to an absolute path
-    verifiedLeads = leads.map((id) => resolve.sync(id, {
+    verifiedLeads = leads.map((id) => nodeResolve.sync(id, {
       basedir,
       extensions: ['.js', '.jsx'],
+      packageFilter: this.options.packageFilter,
     }));
+
+    // Filter leads after resolved
+    if (options.postFilter) verifiedLeads = leads.filter(options.postFilter);
 
     /**
      * if ignorePackages is on then packages in the node_moduels dir will be
      * ignored.
      */
-    if (this.options.ignorePackages) {
+    if (options.ignorePackages) {
       verifiedLeads = verifiedLeads.filter((id) => {
         return !id.includes('node_modules');
       });
     }
 
     // If options.resolve is a not a function then just return the leads as is
-    if (typeof this.options.resolve !== 'function') return verifiedLeads;
+    if (typeof options.map !== 'function') return verifiedLeads;
 
     // Use the custom resolve method to further locate things
-    return verifiedLeads.map(this.options.resolve);
+    return verifiedLeads.map(this.options.map);
   }
 
   /**
