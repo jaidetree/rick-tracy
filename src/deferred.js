@@ -2,19 +2,28 @@
  * Deferred is a simple way to use promises in a slightly cleaner style.
  * @extends Promise
  */
-export default class Deferred extends Promise {
+export default class Deferred {
   /**
    * Initializes the deferred interface.
    *
    * @param {*} resolvedValue - A value to immediately resolve with.
    */
   constructor (resolvedValue) {
-    super((resolve, reject) => {
+    this._promise = new Promise((resolve, reject) => {
       this.resolve = resolve;
       this.reject = reject;
 
       if (resolvedValue) resolve(resolvedValue);
     });
+  }
+
+  /**
+   * Returns the promise interface for this deferred promise
+   *
+   * @returns {Promise} Deferred promise instance
+   */
+  promise () {
+    return this._promise;
   }
 
   /**

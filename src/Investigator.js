@@ -85,7 +85,7 @@ export default class Investigator extends Duplex {
 
     transformStreams = transformStreams.map((transform) => {
       // If transform is a string try to import it
-      if (typeof transform !== 'function') {
+      if (typeof transform === 'string') {
         transform = require(nodeResolve.sync(transform));
       }
 
@@ -154,7 +154,7 @@ export default class Investigator extends Duplex {
       source,
     });
 
-    return deferred;
+    return deferred.promise();
   }
 
   /**
@@ -241,7 +241,7 @@ export default class Investigator extends Duplex {
 
     vinylFile.read(lead, deferred.callback);
 
-    return deferred;
+    return deferred.promise();
   }
 
   /**
