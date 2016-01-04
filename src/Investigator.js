@@ -227,7 +227,7 @@ export default class Investigator extends Duplex {
     if (this.options.compileES6Modules) {
       let result = babel.transform(suspect.contents.toString('utf8'), {
         babelrc: false,
-        presets: ['stage-1'],
+        presets: ['stage-0'],
         plugins: ['transform-es2015-modules-commonjs'],
         sourceMap: false,
       });

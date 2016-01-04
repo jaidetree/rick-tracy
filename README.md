@@ -6,13 +6,55 @@ Detective Rick Tracy is a pluggable dependency graph array generator written in 
  - [x] Completed main source
  - [x] Implement [Labeled Stream Splicer](https://github.com/substack/labeled-stream-splicer)
  - [x] Write a readable stream for testing that pushes content from an array.
- - [ ] Write Unit tests for each class.
- - [ ] Write a test for the final workflow.
+ - [x] Write Unit tests for each class.
+ - [x] Write a test for the final workflow.
  - [ ] Document all the things in the readme.
 
 ## Installation
 
 ## Usage
+
+```js
+import fs from 'fs';
+import JSONStream from 'JSONStream';
+import RickTracy from 'rick-tracy';
+
+let rickTracy = new RickTracy({
+ // the usual suspects ;)
+ lineup: 'path/to/entry/points/**\/*.js'
+});
+
+rickTracy.pipeline.get('trace').unshift(through2.obj((file, enc, done) => {
+  // Allows you to modify the vinyl entry point files before tracing begins.
+  console.log(file);
+
+  // Normal through stream stuff
+  done(null, file);
+}));
+
+// Writes the depdendency tree to a text file as part of the pipeline
+let output = new fs.createWriteStream('tree.txt');
+
+// Is appended to the pipeline after storing into the tree structure
+rickTracy.pipline.get('store').push(output);
+
+// Build the dependency graph and write to a writable stream
+rickTracy.investigate()
+ .pipe(JSONStream.stringify())
+ .pipe(fs.createWriteStream('out.txt'))
+
+// Or get the tree from the complete handler
+rickTracy.investigate()
+ .on('complete', (caseFile) => {
+   console.log(caseFile);
+ });
+
+// Or retrive it from a writable callback
+rickTracy.investigate()
+  .pipe(rickTracy.report((caseFile) => {
+    console.log(caseFile);
+  });
+```
 
 ## Customization
 

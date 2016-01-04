@@ -16,20 +16,34 @@ import vfs from 'vinyl-fs';
  *   lineup: 'path/to/entry/points/**\/*.js'
  * });
  *
+ * // Build the dependency graph and write to a writable stream
+ * rickTracy.investigate()
+ *  .pipe(JSONStream.stringify())
+ *  .pipe(fs.createWriteStream('out.txt'))
+ *
+ * // Or get the tree from the complete handler
+ * rickTracy.investigate()
+ *  .on('complete', (caseFile) => {
+ *    console.log(caseFile);
+ *  });
+ *
+ * // Or retrive it from a writable callback
+ * rickTracy.investigate()
+ *  .pipe(rickTracy.report((caseFile) => {
+ *    console.log(caseFile);
+ *  });
+ *
+ * // Modify the pipeline
+ *
  * // Writes the depdendency tree to a text file as part of the pipeline
  * let output = new fs.createWriteStream('tree.txt');
- * investigation.pipeline.get('report').push(JSONSTream.stringify());
- * investigation.pipline.get('report').push(output);
  *
- * // Build the dependency graph
- * rickTracy.investigate()
- *   .pipe(JSONStream.stringify())
- *   .pipe(new fs.createWriteStream())
- *
- *   // Or get the tree from the complete handler
- *   .on('complete', (caseFile) => {
- *     console.log(caseFile);
- *   });
+ * rickTracy.pipeline.get('trace').unshift(through2.obj((file, enc, done) => {
+ *   // Allows you to modify the
+ *   console.log(file);
+ *   done(null, file);
+ * }));
+ * rickTracy.pipline.get('report').push(output);
  */
 
 /**
