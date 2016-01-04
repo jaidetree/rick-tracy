@@ -3,14 +3,36 @@ Detective Rick Tracy is a pluggable dependency graph array generator written in 
 
 ## Todo
 
- - [x] Completed main source
- - [x] Implement [Labeled Stream Splicer](https://github.com/substack/labeled-stream-splicer)
- - [x] Write a readable stream for testing that pushes content from an array.
- - [x] Write Unit tests for each class.
- - [x] Write a test for the final workflow.
- - [ ] Document all the things in the readme.
+- [x] Completed main source
+- [x] Implement [Labeled Stream Splicer](https://github.com/substack/labeled-stream-splicer)
+- [x] Write a readable stream for testing that pushes content from an array.
+- [x] Write Unit tests for each class.
+- [x] Write a test for the final workflow.
+- [ ] Document all the things in the readme.
+
+## Features
+
+- Works with ES6 imports and Common JS `require` mixed in the same source files.
+- Has similar options to `module-deps` for filtering, mapping, and post-resolution filtering ids.
+- Uses a labeled stream splicer to allow stream transforms before and after tracing and creating the dependency graph.
 
 ## Installation
+
+To install from NPM:
+
+`sudo npm install rick-tracy`
+
+Manually via git:
+
+`git clone https://github.com/jayzawrotny/rick-tracy.git`
+
+In node (ES5):
+
+`var RickTracy = require('rick-tracy');`
+
+In node (ES6):
+
+`import RickTracy from 'rick-tracy';`
 
 ## Usage
 
