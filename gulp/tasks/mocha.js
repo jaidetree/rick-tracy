@@ -21,7 +21,7 @@ paths = {};
 paths.src = project.to('test', '*.js');
 paths.watch = [
   project.paths.js.src,
-  paths.src
+  paths.src,
 ];
 
 /**
@@ -36,11 +36,9 @@ function test () {
     .pipe(mocha(args));
 }
 
-gulp.task('test:mocha', () => {
+gulp.task('test', () => {
   return test();
 });
-
-gulp.task('test', ['test:mocha']);
 
 /**
  * Task Watch Test

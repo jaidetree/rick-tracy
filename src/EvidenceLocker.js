@@ -27,10 +27,9 @@ export default class EvidenceLocker extends Transform {
   /**
    * Initializes writable stream interface.
    *
-   * @param {function} cb - Callback to fire when all the evidence is filed.
    * @param {object} opts - Custom options for the record
    */
-  constructor (cb, opts={}) {
+  constructor (opts={}) {
     super({ objectMode: true });
 
     // Initialize our options
@@ -56,7 +55,7 @@ export default class EvidenceLocker extends Transform {
 
     /** For each lead build a case against them too */
     leads.forEach((lead) => {
-      file[lead] = this.buildCase(file, lead, level + 1);
+      file[lead] = this.buildCase(lead, level + 1);
     });
 
     return file;
@@ -74,7 +73,7 @@ export default class EvidenceLocker extends Transform {
 
     process.nextTick(() => {
       if (err) self.emit('error', err);
-      self.emit('close');
+      this.emit('close');
     });
   }
 
@@ -88,14 +87,14 @@ export default class EvidenceLocker extends Transform {
    */
   file (evidence) {
     let { leads, source, suspect } = evidence,
-        file = this.get(suspect);
+        suspectFile = this.get(suspect);
 
     leads.forEach((lead) => {
       /** add to the flat file if there is not an entree already */
       this.get(lead);
 
       /**  */
-      if (file.indexOf(lead) === -1) file.push(lead);
+      if (suspectFile.indexOf(lead) === -1) suspectFile.push(lead);
     });
 
     /** Store an array pointing to our root modules */
@@ -133,7 +132,7 @@ export default class EvidenceLocker extends Transform {
     let caseFile = this.caseFile;
 
     this.kingpins.forEach((kingpin) => {
-      caseFile[kingpin] = this.buildCase(caseFile, kingpin);
+      caseFile[kingpin] = this.buildCase(kingpin, 0);
     });
 
     this.push(caseFile);

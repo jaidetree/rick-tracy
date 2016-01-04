@@ -15,6 +15,8 @@ export default class Deferred {
 
       if (resolvedValue) resolve(resolvedValue);
     });
+
+    this.callback = this.callback.bind(this);
   }
 
   /**

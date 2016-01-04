@@ -1,6 +1,5 @@
-import babel from 'babel-core';
 import combine from 'stream-combiner2';
-import concat from 'stream-concat';
+import concat from 'concat-stream';
 import duplexer from 'duplexer2';
 import nodeResolve from 'resolve';
 import path from 'path';
@@ -11,6 +10,8 @@ import vinylFile from 'vinyl-file';
 import Deferred from './Deferred';
 
 import { Duplex } from 'stream';
+
+let babel = require('babel-core');
 
 /**
  * ---------------------------------------------------------------------------
@@ -56,15 +57,17 @@ export default class Investigator extends Duplex {
     super({ objectMode: true });
 
     this.options = Object.assign({
+      compileES6Modules: true,
       ignorePackages: true,
+      transforms: [],
     }, opts);
 
     this.notes = {};
+    this.transformer = null;
     this._write = this._write.bind(this);
 
     // When finished push the end signal
     this.on('finish', () => {
-      console.log('Finished!');
       this.push(null);
     });
   }
@@ -83,14 +86,14 @@ export default class Investigator extends Duplex {
         stream = duplexer(input, output),
         pipeline;
 
-    transformStreams = transformStreams.map((transform) => {
+    transformStreams = transformStreams.map(([transformer, opts]) => {
       // If transform is a string try to import it
-      if (typeof transform === 'string') {
-        transform = require(nodeResolve.sync(transform));
+      if (typeof transformer === 'string') {
+        transformer = require(nodeResolve.sync(transformer));
       }
 
       // Decorate the stream with an error handler
-      return transform
+      return transformer(opts)
         .on('error', stream.emit.bind(stream, 'error'));
     });
 
@@ -101,7 +104,9 @@ export default class Investigator extends Duplex {
      * Tell our parent duplex stream to pipe to our pipeline. Then tell our
      * pipeline to pipe to the output stream of our parent duplex..
      */
-    input.pipe(pipeline).pipe(output);
+    input
+      .pipe(pipeline)
+      .pipe(output);
 
     return stream;
   }
@@ -114,13 +119,28 @@ export default class Investigator extends Duplex {
    * @returns {Promise} A promise resolved when all sub investigations are done
    */
   interrogate (suspect, source=null) {
-    let leads = [],
-        investigations = [],
+    let self = this,
+        leads = [],
         isNoted = this.isNoted(suspect),
         deferred = new Deferred();
 
+    /**
+     * Pushes the evidence down the stream.
+     *
+     * @param {array} newSuspects - Leads to other deps parsed from the source
+     */
+    function push () {
+      self.push({
+        suspect: suspect.path,
+        leads,
+        source,
+      });
+    }
+
     if (isNoted) {
       leads = this.readNotesOn(suspect);
+      push();
+      deferred.resolve();
     }
 
     /**
@@ -128,31 +148,37 @@ export default class Investigator extends Duplex {
      *  its statements. Then track down those statements to find new suspects.
      */
     else {
-      // Transform the source to make the suspect spill it’s guts
+      /**
+       * Transform the source to make the suspect spill it’s guts. In coding
+       * terms it runs the suspect through the transforms if there are any
+       * then resolves with the final transformed source.
+       */
       this.roughUp(suspect)
         .then((guts) => {
+          let investigations = [];
+
           leads = this.verify(suspect, question(guts));
+
           // Remember this suspect for later.
           this.note(suspect, leads);
 
+          push();
+
           // For each lead found start a new investigation
-          leads.forEach((lead) => {
-            investigations.push(this.trackDown(lead).then((newSuspect) => {
+          investigations = leads.map((lead) => {
+            return this.trackDown(lead).then((newSuspect) => {
               return this.interrogate(newSuspect, suspect.path);
-            }));
+            }).catch(() => { return; });
           });
 
-          // Resolve the deferred result with a promise that is resolved when
-          // all investigations are complete. (tracing of submodules)
+          /**
+           * Resolve the deferred result with a promise that is resolved when
+           * all investigations are complete. (tracing of submodules)
+           */
           deferred.resolve(Promise.all(investigations));
-        });
+        })
+        .catch((err) => this.emit('error', err));
     }
-
-    this.push({
-      suspect: suspect.path,
-      leads,
-      source,
-    });
 
     return deferred.promise();
   }
@@ -201,32 +227,41 @@ export default class Investigator extends Duplex {
     if (this.options.compileES6Modules) {
       let result = babel.transform(suspect.contents.toString('utf8'), {
         babelrc: false,
+        presets: ['stage-1'],
         plugins: ['transform-es2015-modules-commonjs'],
         sourceMap: false,
       });
 
-      code = new Buffer(result.code);
+      code = result.code;
     }
 
     return new Promise((resolve, reject) => {
-      let transformerStream;
-
       // If no transform options are given just return the resulting code
       if (!Array.isArray(transforms) || !transforms.length) {
         resolve(code);
         return;
       }
 
+      if (!this.transformer) {
+        this.transformer = this.createTransformer(transforms);
+      }
+
       // Create transform stream
-      transformerStream = this.createTransformer(transforms)
-        .on('error', reject);
+      this.transformer.on('error', reject);
 
       /**
        * Since transforms could push data in any amount of smaller chunks
        * lets buffer them into a single chunk of text with the fully
-       * transformed.
+       * transformed source.
        */
-      transformerStream.pipe(concat(resolve));
+      this.transformer
+        .pipe(concat((result) => {
+          this.transformer.removeListener('error', reject);
+          this.transformer.unpipe();
+          resolve(result);
+        }));
+
+      this.transformer.end(code);
     });
   }
 
@@ -245,6 +280,22 @@ export default class Investigator extends Duplex {
   }
 
   /**
+   * Adds a transformer and options to the transform function
+   *
+   * @param {function} transformer - Returns a configured transform stream
+   * @param {object} opts - Options to configure the transformer with
+   * @returns {object} this For method chaining
+   */
+  transform (transformer, opts={}) {
+    this.options.transforms.push([
+      transformer,
+      opts,
+    ]);
+
+    return this;
+  }
+
+  /**
    * Verify leads are legit. But actually if a file has `require('./models')`
    * then lets resolve that from the suspect's absolute path directory name.
    * After we might want to call the custom resolve method specified in the
@@ -257,17 +308,26 @@ export default class Investigator extends Duplex {
   verify (suspect, leads) {
     let basedir = path.dirname(suspect.path),
         options = this.options,
-        verifiedLeads = [];
+        verifiedLeads = leads;
 
     // Filter leads
-    if (options.filter) verifiedLeads = leads.filter(options.filter);
+    if (options.filter) verifiedLeads = verifiedLeads.filter(options.filter);
 
     // Resolve the packages to an absolute path
-    verifiedLeads = leads.map((id) => nodeResolve.sync(id, {
-      basedir,
-      extensions: ['.js', '.jsx'],
-      packageFilter: this.options.packageFilter,
-    }));
+    verifiedLeads = verifiedLeads.map((id) => {
+      try {
+        return nodeResolve.sync(id, {
+          basedir,
+          extensions: ['.js', '.jsx'],
+          packageFilter: this.options.packageFilter,
+        });
+      }
+      catch (err) {
+        return null;
+      }
+    });
+
+    verifiedLeads = verifiedLeads.filter((lead) => !!lead);
 
     // Filter leads after resolved
     if (options.postFilter) verifiedLeads = leads.filter(options.postFilter);
@@ -278,7 +338,7 @@ export default class Investigator extends Duplex {
      */
     if (options.ignorePackages) {
       verifiedLeads = verifiedLeads.filter((id) => {
-        return !id.includes('node_modules');
+        return !id.includes('node_modules') && !(/^[-a-zA-Z0-9]+$/).test(id);
       });
     }
 
@@ -305,6 +365,11 @@ export default class Investigator extends Duplex {
    */
   _write (suspect, enc, done) {
     this.interrogate(suspect)
-      .then(() => done());
+      .then(() => {
+        done();
+      })
+      .catch((err) => {
+        this.emit('error', err);
+      });
   }
 }

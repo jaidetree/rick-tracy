@@ -5,7 +5,7 @@ Detective Rick Tracy is a pluggable dependency graph array generator written in 
 
  - [x] Completed main source
  - [x] Implement [Labeled Stream Splicer](https://github.com/substack/labeled-stream-splicer)
- - [ ] Write a readable stream for testing that pushes content from an array.
+ - [x] Write a readable stream for testing that pushes content from an array.
  - [ ] Write Unit tests for each class.
  - [ ] Write a test for the final workflow.
  - [ ] Document all the things in the readme.

@@ -22,6 +22,6 @@ export default class CaseReporter extends Writable {
   _write (caseFile, enc, done) {
     this.cb(caseFile);
 
-    done(caseFile);
+    done(null, caseFile);
   }
 }

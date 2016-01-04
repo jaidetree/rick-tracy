@@ -48,7 +48,6 @@ export default class RickTracy extends EventEmitter {
   process = [
     'trace',
     'store',
-    'report',
   ];
 
   /**
@@ -72,12 +71,16 @@ export default class RickTracy extends EventEmitter {
         compileES6Modules: true, // Use babel to compile imports into require.
       },
       evidence: {},
-      report: this.onComplete,
     };
 
     // Extend the default options by each subkey
     Object.keys(opts).forEach((key) => {
-      Object.assign(this.options[key], opts[key]);
+      if (typeof this.options[key] === 'object') {
+        Object.assign(this.options[key], opts[key]);
+      }
+      else if (typeof this.options[key] === 'string') {
+        this.options[key] = opts[key];
+      }
     });
 
     this.pipeline = this.createPipeline();
@@ -97,7 +100,7 @@ export default class RickTracy extends EventEmitter {
     // Build our stream splicer array which is ['label', stream()]
     this.process.forEach((label) => {
       pipeline.push(label);
-      pipeline.push(this.passTo(`_${label}`));
+      pipeline.push([this.passTo(`_${label}`)]);
     });
 
     // Return our splicer instance
@@ -111,8 +114,11 @@ export default class RickTracy extends EventEmitter {
    * @returns {stream} Resulting stream from the pipeline.
    */
   investigate () {
-    return vfs.src(this.options.lineup)
-      .pipe(this.pipeline);
+    return vfs.src(this.options.lineup, {
+      cwd: this.options.cwd || process.cwd(),
+      base: this.options.base,
+    })
+    .pipe(this.pipeline);
   }
 
   /**
@@ -137,6 +143,18 @@ export default class RickTracy extends EventEmitter {
   }
 
   /**
+   * Simple reporter to get back the finished case file
+   * @param {function} cb - Callback to fire when finished
+   * @returns {stream.Writable} A writable stream to store the final case file
+   */
+  report (cb) {
+    return new CaseReporter((caseFile) => {
+      cb(caseFile);
+      this.onComplete(caseFile);
+    });
+  }
+
+  /**
    * Traces our dependencies. Takes an input of vinyl files and produces an
    * object detailing each dependency and its parent and children.
    *
@@ -155,16 +173,5 @@ export default class RickTracy extends EventEmitter {
    */
   _store (options) {
     return new EvidenceLocker(options.evidence);
-  }
-
-  /**
-   * A writable stream to consume the dependency tree and fire our callback
-   * to emit a complete event with the final tree.
-   *
-   * @param {object} options - Our initial options passed to class constructor
-   * @returns {stream} A stream to be used in the main pipeline
-   */
-  _report (options) {
-    return new CaseReporter(options.report);
   }
 }

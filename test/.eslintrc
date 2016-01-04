@@ -1,0 +1,40 @@
+{
+   "parser": "babel-eslint",
+   "env": {
+    "browser": true,
+    "es6": true,
+    "node": true
+   },
+   "globals": {
+    "require": true,
+    "describe": true,
+    "it": true
+   },
+   "ecmaFeatures": {
+    "arrowFunctions": true,
+    "binaryLiterals": true,
+    "blockBindings": true,
+    "classes": true,
+    "destructuring": true,
+    "forOf": true,
+    "generators": true,
+    "modules": true,
+    "objectLiteralComputerProperties": true,
+    "objectLiteralDuplicateProperties": true,
+    "objectLiteralShorthandMethods": true,
+    "objectLiteralShorthandProperties": true,
+    "octalLiterals": true,
+    "regexUFlag": true,
+    "regexYFlag": true,
+    "restParams": true,
+    "spread": true,
+    "superInFunctions": true,
+    "templateStrings": true,
+    "unicodeCodePointEscapes": true,
+    "experimentalObjectRestSpread": true,
+    "jsx": false
+   },
+  "rules": {
+    "max-nested-callbacks": 0, // ....................... Specify the maximum depth callbacks can be nested
+  }
+}
