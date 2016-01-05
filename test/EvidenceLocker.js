@@ -1,5 +1,5 @@
 import expect from 'expect';
-import Input from './lib/input';
+import Input from './lib/Input';
 import EvidenceLocker from '../src/EvidenceLocker';
 
 import { buffer } from 'gulp-util';

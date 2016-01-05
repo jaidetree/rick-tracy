@@ -1,5 +1,5 @@
 import expect from 'expect';
-import Input from './lib/input';
+import Input from './lib/Input';
 import CaseReporter from '../src/CaseReporter';
 
 import { Writable } from 'stream';
