@@ -91,7 +91,7 @@ export default class RickTracy extends EventEmitter {
     // Extend the default options by each subkey
     Object.keys(opts).forEach((key) => {
       if (typeof this.options[key] === 'object') {
-        Object.assign(this.options[key], opts[key]);
+        this.options[key] = Object.assign(this.options[key], opts[key]);
       }
       else if (typeof this.options[key] === 'string') {
         this.options[key] = opts[key];
@@ -197,7 +197,7 @@ export default class RickTracy extends EventEmitter {
    * @returns {stream} A stream to be used in the main pipeline
    */
   _trace (options) {
-    return new Investigator(options.investigate);
+    return new Investigator(options.trace);
   }
 
   /**

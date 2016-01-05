@@ -228,7 +228,7 @@ export default class Investigator extends Duplex {
       let result = babel.transform(suspect.contents.toString('utf8'), {
         babelrc: false,
         presets: ['stage-0'],
-        plugins: ['transform-es2015-modules-commonjs'],
+        plugins: ['transform-react-jsx', 'transform-es2015-modules-commonjs'],
         sourceMap: false,
       });
 
@@ -313,6 +313,15 @@ export default class Investigator extends Duplex {
     // Filter leads
     if (options.filter) verifiedLeads = verifiedLeads.filter(options.filter);
 
+    // Try to eliminate the node modules early
+    if (options.ignorePackages) {
+      verifiedLeads = verifiedLeads.filter((id) => {
+        return (id.includes('.js') || id.includes('/'))
+          && !id.endsWith('.css')
+          && !id.endsWith('.html');
+      });
+    }
+
     // Map the ids if a map function has been added
     if (this.options.map) {
       verifiedLeads = verifiedLeads.map(this.options.map);
@@ -343,7 +352,7 @@ export default class Investigator extends Duplex {
      */
     if (options.ignorePackages) {
       verifiedLeads = verifiedLeads.filter((id) => {
-        return !id.includes('node_modules') && !(/^[-a-zA-Z0-9]+$/).test(id);
+        return !id.includes('node_modules');
       });
     }
 

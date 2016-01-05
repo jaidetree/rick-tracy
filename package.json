@@ -25,6 +25,7 @@
   "dependencies": {
     "babel-core": ">= 6.2.1 < 7",
     "babel-plugin-transform-es2015-modules-commonjs": ">= 6.3.16 < 7",
+    "babel-plugin-transform-react-jsx": ">= 6 < 7",
     "babel-preset-stage-0": ">= 6.1.18 < 7",
     "concat-stream": "^1.5.1",
     "detective-cjs": "^1.0.5",
