@@ -256,5 +256,7 @@ BSD-3-Clause (c) 2016 VenueBook, Inc.
 
 [labeled stream splicer)]: https://github.com/substack/labeled-stream-splicer
 
+[build-badge]: https://img.shields.io/travis/jayzawrotny/rick-tracy/master.svg?style=flat-square
+[build]: https://travis-ci.org/jayzawrotny/rick-tracy
 [npm-badge]: https://img.shields.io/npm/v/rick-tracy.svg?style=flat-square
 [npm]: https://www.npmjs.org/package/rick-tracy
