@@ -313,6 +313,11 @@ export default class Investigator extends Duplex {
     // Filter leads
     if (options.filter) verifiedLeads = verifiedLeads.filter(options.filter);
 
+    // Map the ids if a map function has been added
+    if (this.options.map) {
+      verifiedLeads = verifiedLeads.map(this.options.map);
+    }
+
     // Resolve the packages to an absolute path
     verifiedLeads = verifiedLeads.map((id) => {
       try {
@@ -345,8 +350,7 @@ export default class Investigator extends Duplex {
     // If options.resolve is a not a function then just return the leads as is
     if (typeof options.map !== 'function') return verifiedLeads;
 
-    // Use the custom resolve method to further locate things
-    return verifiedLeads.map(this.options.map);
+    return verifiedLeads;
   }
 
   /**

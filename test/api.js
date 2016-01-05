@@ -26,6 +26,7 @@ DATA.tree = {
   },
   [join('index.js')]: {
     [join('CaseReporter.js')]: {},
+    [join('Deferred.js')]: {},
     [join('Investigator.js')]: {
       [join('Deferred.js')]: {},
     },
@@ -50,17 +51,16 @@ describe('RickTracy', () => {
   });
 
   describe('#investigate()', () => {
-    it('Should trace dependencies', (done) => {
+    it('Should trace dependencies', () => {
       let rick = new RickTracy({
         lineup: '../src/**/*.js',
       });
 
-      rick.investigate()
-        .pipe(rick.report((caseFile) => {
+      return rick.investigate()
+        .then((caseFile) => {
           expect(caseFile).toExist();
           expect(caseFile).toEqual(DATA.tree);
-          done();
-        }));
+        });
     });
   });
 });

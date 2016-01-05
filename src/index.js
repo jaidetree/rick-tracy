@@ -1,4 +1,5 @@
 import CaseReporter from './CaseReporter';
+import Deferred from './Deferred';
 import Investigator from './Investigator';
 import EventEmitter from 'events';
 import EvidenceLocker from './EvidenceLocker';
@@ -125,14 +126,19 @@ export default class RickTracy extends EventEmitter {
    * Begins tracing the dependenceis and piping the vinyl files into our
    * pipeline.
    *
+   * @param {object} opts - Extra options to customize the behavior per-run.
    * @returns {stream} Resulting stream from the pipeline.
    */
-  investigate () {
-    return vfs.src(this.options.lineup, {
-      cwd: this.options.cwd || process.cwd(),
-      base: this.options.base,
-    })
-    .pipe(this.pipeline);
+  investigate (opts={}) {
+    let deferred = new Deferred();
+
+    this.read(opts)
+      .pipe(this.pipeline)
+      .pipe(this.report(deferred.resolve));
+
+    this.once('error', deferred.reject);
+
+    return deferred.promise();
   }
 
   /**
@@ -154,6 +160,21 @@ export default class RickTracy extends EventEmitter {
   passTo (methodName) {
     return this[methodName](this.options)
       .on('error', this.emit.bind(this, 'error'));
+  }
+
+  /**
+   * Creates the initial stream of vinyl entry point files
+   *
+   * @param {object} opts - Options to pass into vinyl-fs;
+   * @returns {stream} A vinyl-fs readable stream.
+   */
+  read (opts={}) {
+    let options = Object.assign({}, this.options, opts);
+
+    return vfs.src(options.lineup, {
+      cwd: options.cwd || process.cwd(),
+      base: options.base,
+    });
   }
 
   /**
