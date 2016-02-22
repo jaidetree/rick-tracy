@@ -46,6 +46,10 @@ let babel = require('babel-core');
  * the suspects.
  */
 export default class Investigator extends Duplex {
+  options = {};
+  notes = {};
+  transformer = null;
+
   /**
    * Initializes the investigator
    *
@@ -62,12 +66,12 @@ export default class Investigator extends Duplex {
       transforms: [],
     }, opts);
 
-    this.notes = {};
-    this.transformer = null;
     this._write = this._write.bind(this);
 
     // When finished push the end signal
     this.on('finish', () => {
+      this.interrogated = {};
+      this.notes = {};
       this.push(null);
     });
   }
@@ -119,27 +123,40 @@ export default class Investigator extends Duplex {
    * @returns {Promise} A promise resolved when all sub investigations are done
    */
   interrogate (suspect, source=null) {
-    let self = this,
-        leads = [],
-        isNoted = this.isNoted(suspect),
+    let leads = [],
         deferred = new Deferred();
+
+    // if (source) {
+    //   /**
+    //    * If we have visited this suspect from this source before don't trace
+    //    * it down again.
+    //    */
+    //   if (this.isOnRecord(source, suspect.path)) {
+    //     deferred.resolve();
+    //     return deferred.promise();
+    //   }
+
+    //   /**
+    //    * Otherwise we can store the source & lead so we don't trace it again
+    //    * later.
+    //    */
+    //   this.record(source, suspect.path);
+    // }
 
     /**
      * Pushes the evidence down the stream.
-     *
-     * @param {array} newSuspects - Leads to other deps parsed from the source
      */
     function push () {
-      self.push({
+      this.push({
         suspect: suspect.path,
         leads,
         source,
       });
     }
 
-    if (isNoted) {
+    if (this.isNoted(suspect)) {
       leads = this.readNotesOn(suspect);
-      push();
+      push.call(this);
       deferred.resolve();
     }
 
@@ -154,21 +171,23 @@ export default class Investigator extends Duplex {
        * then resolves with the final transformed source.
        */
       this.roughUp(suspect)
-        .then((guts) => {
+        .then((story) => {
           let investigations = [];
 
-          leads = this.verify(suspect, question(guts));
+          leads = this.verify(suspect, question(story));
 
           // Remember this suspect for later.
           this.note(suspect, leads);
 
-          push();
+          push.call(this);
 
           // For each lead found start a new investigation
           investigations = leads.map((lead) => {
-            return this.trackDown(lead).then((newSuspect) => {
-              return this.interrogate(newSuspect, suspect.path);
-            }).catch(() => { return; });
+            return this.trackDown(lead)
+              .then((newSuspect) => {
+                return this.interrogate(newSuspect, suspect.path);
+              })
+              .catch(() => {});
           });
 
           /**
@@ -226,6 +245,7 @@ export default class Investigator extends Duplex {
     // If the user has specified not to compile ES6 modules then uh don’t.
     if (this.options.compileES6Modules) {
       let result = babel.transform(suspect.contents.toString('utf8'), {
+        filename: path.basename(suspect.path),
         babelrc: false,
         presets: ['stage-0'],
         plugins: ['transform-react-jsx', 'transform-es2015-modules-commonjs'],
@@ -323,9 +343,7 @@ export default class Investigator extends Duplex {
     }
 
     // Map the ids if a map function has been added
-    if (this.options.map) {
-      verifiedLeads = verifiedLeads.map(this.options.map);
-    }
+    if (this.options.map) verifiedLeads = verifiedLeads.map(this.options.map);
 
     // Resolve the packages to an absolute path
     verifiedLeads = verifiedLeads.map((id) => {

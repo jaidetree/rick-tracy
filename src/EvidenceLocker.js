@@ -1,4 +1,24 @@
+import log from 'liquidlog';
 import { Transform } from 'stream';
+
+/**
+ * Warns the user if we find a recursive circular dependency
+ * @param {string} suspect - Suspect absolute path file
+ * @param {string} lead - Lead absolute path file
+ */
+function logCircularDependencyError (suspect, lead) {
+  let common = '',
+      dirs = suspect.split('/');
+
+  if (dirs.length > 3) common = dirs.slice(0, -3).join('/') + '/';
+
+  log.error('rick-tracy')
+    .action('Skipping circular dependency')
+    .data(lead.replace(common, ''))
+    .text('from')
+    .data(suspect.replace(common, ''))
+    .send();
+}
 
 /**
  * ---------------------------------------------------------------------------
@@ -54,9 +74,15 @@ export default class EvidenceLocker extends Transform {
         file = {};
 
     /** For each lead build a case against them too */
-    leads.forEach((lead) => {
+    for (let lead of leads) {
+      /** No recursive circular dependencies */
+      if (suspect === lead) {
+        logCircularDependencyError(suspect, lead);
+        return file;
+      }
+
       file[lead] = this.buildCase(lead, level + 1);
-    });
+    }
 
     return file;
   }
@@ -93,7 +119,6 @@ export default class EvidenceLocker extends Transform {
       /** add to the flat file if there is not an entree already */
       this.get(lead);
 
-      /**  */
       if (suspectFile.indexOf(lead) === -1) suspectFile.push(lead);
     });
 
