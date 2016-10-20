@@ -1,6 +1,6 @@
 {
   "name": "rick-tracy",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "A pluggable dependency graph array generator. Detective Rick Tracy always catches mad modules!",
   "main": "index.js",
   "scripts": {
