@@ -1,3 +1,4 @@
+import CriminalRecord from './CriminalRecord';
 import log from 'liquidlog';
 import { Transform } from 'stream';
 
@@ -57,6 +58,7 @@ export default class EvidenceLocker extends Transform {
     this.flatList = {};
     this.caseFile = {};
     this.kingpins = [];
+    this.record = new CriminalRecord();
 
     // Taken from the through2 source
     this._destroyed = false;
@@ -69,19 +71,27 @@ export default class EvidenceLocker extends Transform {
    * @param {int} [level=0] - Recursion level
    * @returns {object} Mutated case file
    */
-  buildCase (suspect, level=0) {
+  buildCase (suspect, kingpin, level=0) {
     let leads = this.get(suspect),
         file = {};
 
     /** For each lead build a case against them too */
     for (let lead of leads) {
-      /** No recursive circular dependencies */
-      if (suspect === lead) {
-        logCircularDependencyError(suspect, lead);
-        return file;
-      }
+      if (!this.record.has(kingpin, suspect, lead)) {
+        /**
+         * Store that we have been down this road now so we don't go down it
+         * again which causes circular dependency leaks causing stack overflows
+         */
+        this.record.store(kingpin, suspect, lead);
 
-      file[lead] = this.buildCase(lead, level + 1);
+        /** No recursive circular dependencies */
+        if (suspect === lead) {
+          logCircularDependencyError(suspect, lead);
+          return file;
+        }
+
+        file[lead] = this.buildCase(lead, kingpin, level + 1);
+      }
     }
 
     return file;
@@ -157,7 +167,7 @@ export default class EvidenceLocker extends Transform {
     let caseFile = this.caseFile;
 
     this.kingpins.forEach((kingpin) => {
-      caseFile[kingpin] = this.buildCase(kingpin, 0);
+      caseFile[kingpin] = this.buildCase(kingpin, kingpin, 0);
     });
 
     this.push(caseFile);

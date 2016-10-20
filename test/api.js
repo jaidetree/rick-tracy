@@ -20,7 +20,10 @@ DATA.base = path.resolve(__dirname, '..', 'src');
 DATA.tree = {
   [join('CaseReporter.js')]: {},
   [join('Deferred.js')]: {},
-  [join('EvidenceLocker.js')]: {},
+  [join('CriminalRecord.js')]: {},
+  [join('EvidenceLocker.js')]: {
+    [join('CriminalRecord.js')]: {},
+  },
   [join('Investigator.js')]: {
     [join('Deferred.js')]: {},
   },
@@ -30,7 +33,9 @@ DATA.tree = {
     [join('Investigator.js')]: {
       [join('Deferred.js')]: {},
     },
-    [join('EvidenceLocker.js')]: {},
+    [join('EvidenceLocker.js')]: {
+      [join('CriminalRecord.js')]: {},
+    },
   },
 };
 

@@ -126,23 +126,6 @@ export default class Investigator extends Duplex {
     let leads = [],
         deferred = new Deferred();
 
-    // if (source) {
-    //   /**
-    //    * If we have visited this suspect from this source before don't trace
-    //    * it down again.
-    //    */
-    //   if (this.isOnRecord(source, suspect.path)) {
-    //     deferred.resolve();
-    //     return deferred.promise();
-    //   }
-
-    //   /**
-    //    * Otherwise we can store the source & lead so we don't trace it again
-    //    * later.
-    //    */
-    //   this.record(source, suspect.path);
-    // }
-
     /**
      * Pushes the evidence down the stream.
      */

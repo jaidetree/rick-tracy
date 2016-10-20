@@ -228,7 +228,10 @@ describe('Investigator', () => {
       let investigator = new Investigator();
 
       return investigator
-        .roughUp({ contents: "import a from './a';" })
+        .roughUp({
+          contents: "import a from './a';",
+          path: 'hello/world/test.js',
+        })
         .then((code) => {
           expect(code).toInclude('require');
           expect(code).toExclude('import');
@@ -241,7 +244,10 @@ describe('Investigator', () => {
       });
 
       return investigator
-        .roughUp({ contents: "import a from './a';" })
+        .roughUp({
+          contents: "import a from './a';",
+          path: 'hello/world/test.js',
+        })
         .then((code) => {
           expect(code).toInclude('require');
           expect(code).toExclude('import');
